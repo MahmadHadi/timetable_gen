@@ -4,12 +4,14 @@ import connectDB from "./config/db.js";
 import subjectRoutes from "./routes/subjectRoutes.js";
 import teacherRoutes from "./routes/teacherRoutes.js";
 import timetableRoutes from "./routes/timetableRoutes.js";
+import cors from "cors";
 
 // Connect to MongoDB
 connectDB();
 
 const app = express();
 
+app.use(cors()); // Enables CORS for all routes
 // Middleware
 app.use(express.json());
 
