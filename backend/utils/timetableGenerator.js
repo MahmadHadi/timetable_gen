@@ -8,6 +8,8 @@ export const TIME_SLOTS = [
   { startTime: "12:00", endTime: "13:00" },
   { startTime: "14:00", endTime: "15:00" },
   { startTime: "15:00", endTime: "16:00" },
+  { startTime: "16:00", endTime: "17:00" },
+  { startTime: "17:00", endTime: "18:00" },
 ];
 
 // Total available slots in a week = 5 days × 5 periods = 25
@@ -19,19 +21,6 @@ export const TOTAL_SLOTS = DAYS.length * TIME_SLOTS.length;
  * Returns a Map<subjectId (string), Teacher[]>
  * so we can quickly find who can teach a given subject.
  */
-// export const buildTeacherMap = (teachers) => {
-//   const map = new Map(); // subjectId → [teacher, ...]
-
-//   for (const teacher of teachers) {
-//     for (const subjectId of teacher.subjects) {
-//       const key = subjectId.toString();
-//       if (!map.has(key)) map.set(key, []);
-//       map.get(key).push(teacher);
-//     }
-//   }
-
-//   return map;
-// };
 // ─── Build teacher → subjects lookup ──────────────────────────────────────────
 
 export const buildTeacherMap = (teachers) => {
