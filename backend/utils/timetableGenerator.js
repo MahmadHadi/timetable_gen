@@ -1,4 +1,4 @@
-// ─── Constants ────────────────────────────────────────────────────────────────
+// utils/timetableGenerator.js
 
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
@@ -8,163 +8,121 @@ export const TIME_SLOTS = [
   { startTime: "12:00", endTime: "13:00" },
   { startTime: "14:00", endTime: "15:00" },
   { startTime: "15:00", endTime: "16:00" },
-  { startTime: "16:00", endTime: "17:00" },
-  { startTime: "17:00", endTime: "18:00" },
 ];
 
-// Total available slots in a week = 5 days × 5 periods = 25
-export const TOTAL_SLOTS = DAYS.length * TIME_SLOTS.length;
+// helper
+const busyKey = (teacherId, day, startTime) =>
+  `${teacherId}_${day}_${startTime}`;
 
-// ─── Build teacher → subjects lookup ──────────────────────────────────────────
-
-/**
- * Returns a Map<subjectId (string), Teacher[]>
- * so we can quickly find who can teach a given subject.
- */
-// ─── Build teacher → subjects lookup ──────────────────────────────────────────
-
-export const buildTeacherMap = (teachers) => {
+// build teacher map
+const buildTeacherMap = (teachers) => {
   const map = new Map();
 
-  // 🔍 DEBUG — remove once confirmed working
-  console.log("── buildTeacherMap debug ──");
-
   for (const teacher of teachers) {
-    // Fix 1: Safely extract the id whether subjects holds ObjectIds OR
-    //        populated Subject documents (both shapes handled).
-    const subjectIds = teacher.subjects.map((s) =>
-      typeof s === "object" && s._id ? s._id.toString() : s.toString(),
-    );
-
-    // 🔍 DEBUG
-    console.log(`Teacher "${teacher.name}" → subject keys:`, subjectIds);
-
-    for (const key of subjectIds) {
+    for (const sub of teacher.subjects) {
+      const key = sub.toString();
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(teacher);
     }
   }
 
-  // 🔍 DEBUG
-  console.log("teacherMap keys:", [...map.keys()]);
-
   return map;
 };
 
-// ─── Core generation ──────────────────────────────────────────────────────────
-
-/**
- * Pure function — no DB calls, no Express objects.
- *
- * @param {Subject[]} subjects  - Mongoose Subject documents
- * @param {Teacher[]} teachers  - Mongoose Teacher documents
- * @returns {{ slots: object[], warnings: string[] }}
- */
-export const buildTimetable = (subjects, teachers) => {
-  const warnings = [];
+// MAIN MULTI CLASS FUNCTION
+export const generateMultiClassTimetable = (classes, subjects, teachers) => {
   const teacherMap = buildTeacherMap(teachers);
+  const globalBusy = new Set();
 
-  // ─── 1. Build the pending queue ────────────────────────────────────────────
-  const pending = [];
+  const result = {};
 
-  for (const subject of subjects) {
-    // Fix 2: Always call .toString() on the Mongoose _id
-    const subjectId = subject._id.toString();
+  for (const className of classes) {
+    const slots = [];
 
-    // 🔍 DEBUG
-    console.log(`Subject "${subject.name}" → _id key: ${subjectId}`);
+    // create queue based on hoursPerWeek
+    const queue = [];
 
-    const assignableTeachers = teacherMap.get(subjectId) || [];
+    for (const sub of subjects) {
+      const teachersForSub = teacherMap.get(sub._id.toString()) || [];
 
-    if (assignableTeachers.length === 0) {
-      warnings.push(
-        `No teacher assigned to subject "${subject.name}" — it will be skipped.`,
-      );
-      continue;
-    }
+      if (teachersForSub.length === 0) continue;
 
-    pending.push({
-      subject,
-      teachers: assignableTeachers,
-      remaining: subject.hoursPerWeek,
-    });
-  }
-
-  // ── 2. Sanity-check: do we have enough room in the week? ───────────────────
-  const totalRequired = pending.reduce((sum, e) => sum + e.remaining, 0);
-
-  if (totalRequired > TOTAL_SLOTS) {
-    warnings.push(
-      `Total required hours (${totalRequired}) exceeds available weekly slots ` +
-        `(${TOTAL_SLOTS}). Some subjects will be partially scheduled.`,
-    );
-  }
-
-  // ── 3. Conflict tracker ────────────────────────────────────────────────────
-  // Key format: "teacherId|day|startTime"
-  // Using a Set gives O(1) insert and lookup.
-  const teacherBusy = new Set();
-
-  const busyKey = (teacherId, day, startTime) =>
-    `${teacherId}|${day}|${startTime}`;
-
-  // ── 4. Greedy slot-filling ─────────────────────────────────────────────────
-  const slots = [];
-
-  for (const day of DAYS) {
-    for (const { startTime, endTime } of TIME_SLOTS) {
-      // Sort descending by remaining hours so subjects with the most need
-      // are always tried first — prevents them from being crowded out later.
-      pending.sort((a, b) => b.remaining - a.remaining);
-
-      let slotFilled = false;
-
-      for (const entry of pending) {
-        if (entry.remaining === 0) continue;
-
-        // Find the first teacher for this subject who is free right now.
-        const availableTeacher = entry.teachers.find(
-          (t) => !teacherBusy.has(busyKey(t._id, day, startTime)),
-        );
-
-        if (!availableTeacher) continue; // all teachers busy → try next subject
-
-        // ✅ Found a valid assignment
-        slots.push({
-          day,
-          startTime,
-          endTime,
-          subject: entry.subject,
-          teacher: availableTeacher,
+      for (let i = 0; i < sub.hoursPerWeek; i++) {
+        queue.push({
+          subject: sub,
+          teachers: teachersForSub,
         });
-
-        teacherBusy.add(busyKey(availableTeacher._id, day, startTime));
-        entry.remaining--;
-        slotFilled = true;
-        break; // move on to the next time slot
-      }
-
-      if (!slotFilled) {
-        // Only warn when there is still unscheduled demand.
-        const hasPendingWork = pending.some((e) => e.remaining > 0);
-        if (!hasPendingWork) continue; // queue exhausted — empty slot is normal
-        // All remaining subjects have no free teacher at this time — leave slot empty.
-        warnings.push(
-          `Could not fill slot: ${day} ${startTime}–${endTime} (all teachers for remaining subjects are busy at this time).`,
-        );
       }
     }
-  }
 
-  // ── 5. Report any subjects that couldn't be fully scheduled ───────────────
-  for (const entry of pending) {
-    if (entry.remaining > 0) {
-      warnings.push(
-        `Subject "${entry.subject.name}" could only be partially scheduled ` +
-          `(${entry.subject.hoursPerWeek - entry.remaining}/${entry.subject.hoursPerWeek} slots filled).`,
-      );
+    let fallbackToggle = false;
+
+    for (const day of DAYS) {
+      for (const { startTime, endTime } of TIME_SLOTS) {
+        let assigned = false;
+
+        for (let i = 0; i < queue.length; i++) {
+          const item = queue[i];
+
+          const availableTeacher = item.teachers.find(
+            (t) =>
+              !globalBusy.has(
+                busyKey(t._id.toString(), day, startTime)
+              )
+          );
+
+          if (availableTeacher) {
+            slots.push({
+              day,
+              startTime,
+              endTime,
+              subject: {
+                _id: item.subject._id,
+                name: item.subject.name,
+              },
+              teacher: {
+                _id: availableTeacher._id,
+                name: availableTeacher.name,
+              },
+              isFallback: false,
+            });
+
+            globalBusy.add(
+              busyKey(availableTeacher._id.toString(), day, startTime)
+            );
+
+            queue.splice(i, 1);
+            assigned = true;
+            break;
+          }
+        }
+
+        // fallback
+        if (!assigned) {
+          const fallbackSubject = fallbackToggle
+            ? "Library"
+            : "Sports";
+
+          fallbackToggle = !fallbackToggle;
+
+          const original = queue.length > 0 ? queue[0].subject.name : null;
+
+          slots.push({
+            day,
+            startTime,
+            endTime,
+            subject: fallbackSubject,
+            teacher: null,
+            isFallback: true,
+            originalSubject: original,
+            note: "Conflict avoided - adjust later",
+          });
+        }
+      }
     }
+
+    result[className] = { slots };
   }
 
-  return { slots, warnings };
+  return result;
 };

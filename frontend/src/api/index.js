@@ -1,4 +1,8 @@
 // ─── API Base URL ────────────────────────────────────────────────────────────
+// http://localhost:5173/api/timetables/generate-multi
+
+import axios from "axios";
+
 const BASE = "http://localhost:5000/api";
 
 // Helper: throws a readable error when the response is not OK
@@ -25,12 +29,8 @@ async function request(path, options = {}) {
 // ─── Timetables ──────────────────────────────────────────────────────────────
 
 /** Generate a timetable for a given class name */
-export function generateTimetable(className) {
-  return request("/timetables/generate", {
-    method: "POST",
-    body: JSON.stringify({ className }),
-  });
-}
+export const generateTimetable = (data) =>
+  axios.post(`${BASE}/timetables/generate-multi`, data);
 
 /** Fetch all stored timetables */
 export function fetchTimetables() {
