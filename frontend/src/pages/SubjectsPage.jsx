@@ -1,101 +1,140 @@
 import { useEffect, useState } from "react";
-import { fetchSubjects } from "../api/index.js";
-import StatusMessage from "../components/StatusMessage.jsx";
+import axios from "axios";
 
-// ─── Subjects Page ────────────────────────────────────────────────────────────
-// Fetches and displays all subjects from GET /api/subjects.
-//
-// Expected subject shape:
-//   { _id, name, code, hoursPerWeek }
+const BASE = "http://localhost:5000/api";
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [form, setForm] = useState({
+    name: "",
+    code: "",
+    hoursPerWeek: "",
+  });
+
+  // fetch subjects
+  const fetchSubjects = async () => {
+    try {
+      const res = await axios.get(`${BASE}/subjects`);
+      setSubjects(res.data.data);
+      console.log("res", res.data)
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
-    fetchSubjects()
-      .then((data) => setSubjects(Array.isArray(data) ? data : data.subjects ?? []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    fetchSubjects();
   }, []);
 
+  // handle form change
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  // submit form
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      await axios.post(`${BASE}/subjects`, {
+        name: form.name,
+        code: form.code,
+        hoursPerWeek: Number(form.hoursPerWeek),
+      });
+
+      setForm({ name: "", code: "", hoursPerWeek: "" });
+      fetchSubjects();
+    } catch (err) {
+      console.error(err);
+      alert("Error creating subject");
+    }
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
+    <div className="min-h-screen bg-gray-50 text-gray-800 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
 
-      {/* ── Page header ── */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Subjects</h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            All subjects registered in the system.
-          </p>
+        {/* Title */}
+        <h1 className="text-2xl font-semibold">Subjects</h1>
+
+        {/* Form */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
+          <h2 className="text-lg font-medium">Add Subject</h2>
+
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <input
+              type="text"
+              name="name"
+              placeholder="Subject Name"
+              value={form.name}
+              onChange={handleChange}
+              className="border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+
+            <input
+              type="text"
+              name="code"
+              placeholder="Subject Code"
+              value={form.code}
+              onChange={handleChange}
+              className="border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+
+            <input
+              type="number"
+              name="hoursPerWeek"
+              placeholder="Hours / Week"
+              value={form.hoursPerWeek}
+              onChange={handleChange}
+              className="border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+
+            <button
+              type="submit"
+              className="md:col-span-3 border text-blue-500 border-blue-500 hover:text-white hover:bg-blue-600 transition-all px-4 py-2 rounded-md font-medium"
+            >
+              Add Subject
+            </button>
+          </form>
         </div>
-        {!loading && !error && (
-          <span className="bg-teal-50 text-teal-700 text-xs font-semibold px-3 py-1 rounded-full border border-teal-100">
-            {subjects.length} subjects
-          </span>
-        )}
-      </div>
 
-      {/* ── States ── */}
-      {loading && <StatusMessage type="loading" message="Loading subjects…" />}
-      {!loading && error && <StatusMessage type="error" message={error} />}
-      {!loading && !error && subjects.length === 0 && (
-        <StatusMessage type="empty" message="No subjects found." />
-      )}
+        {/* Table */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+          <h2 className="text-lg font-medium mb-4">All Subjects</h2>
 
-      {/* ── Table ── */}
-      {!loading && !error && subjects.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-          <table className="min-w-full text-sm border-collapse bg-white">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-400 border-b border-slate-200">
-                  #
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-400 border-b border-slate-200">
-                  Subject Name
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-400 border-b border-slate-200">
-                  Code
-                </th>
-                <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-widest text-slate-400 border-b border-slate-200">
-                  Hours / Week
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {subjects.map((subject, idx) => (
-                <tr
-                  key={subject._id ?? idx}
-                  className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${
-                    idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
-                  }`}
-                >
-                  <td className="px-5 py-3 text-slate-400 mono text-xs">
-                    {idx + 1}
-                  </td>
-                  <td className="px-5 py-3 font-semibold text-slate-800">
-                    {subject.name ?? "—"}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className="mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-medium">
-                      {subject.code ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-slate-600">
-                    {subject.hoursPerWeek ?? subject.hours_per_week ?? "—"}
-                    {(subject.hoursPerWeek || subject.hours_per_week) ? (
-                      <span className="text-slate-400 text-xs ml-1">hrs</span>
-                    ) : null}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full border text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border p-2 text-left">Name</th>
+                  <th className="border p-2 text-left">Code</th>
+                  <th className="border p-2 text-left">Hours</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {subjects.map((sub) => (
+                  <tr key={sub._id}>
+                    <td className="border p-2">{sub.name}</td>
+                    <td className="border p-2">{sub.code}</td>
+                    <td className="border p-2">{sub.hoursPerWeek}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {subjects.length === 0 && (
+              <p className="text-gray-500 mt-3 text-sm">
+                No subjects found
+              </p>
+            )}
+          </div>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }

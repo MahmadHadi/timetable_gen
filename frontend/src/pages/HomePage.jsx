@@ -65,14 +65,14 @@ export default function HomePage() {
           <div className="flex gap-3">
             <button
               onClick={addClass}
-              className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md text-sm"
+              className="transition-all bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-md text-sm"
             >
               + Add Class
             </button>
 
             <button
               onClick={handleGenerate}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-medium"
+              className="border text-blue-500 border-blue-500 hover:text-white hover:bg-blue-600 transition-all px-4 py-2 rounded-md font-medium"
             >
               {loading ? "Generating..." : "Generate Timetable"}
             </button>

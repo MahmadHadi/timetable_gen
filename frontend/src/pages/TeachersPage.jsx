@@ -1,115 +1,158 @@
 import { useEffect, useState } from "react";
-import { fetchTeachers } from "../api/index.js";
-import StatusMessage from "../components/StatusMessage.jsx";
+import axios from "axios";
 
-// ─── Teachers Page ────────────────────────────────────────────────────────────
-// Fetches and displays all teachers from GET /api/teachers.
-//
-// Expected teacher shape:
-//   { _id, name, email, subjects: ["Math", "Physics"] }
-//   (subjects may also be [{ name }] objects — both are handled)
-
-function resolveSubjects(subjects) {
-  if (!Array.isArray(subjects) || subjects.length === 0) return [];
-  // Handle both string[] and object[]
-  return subjects.map((s) => (typeof s === "string" ? s : s.name ?? "—"));
-}
+const BASE = "http://localhost:5000/api";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
+  const [subjects, setSubjects] = useState([]);
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    subjects: [],
+  });
+
+  // fetch data
+  const fetchData = async () => {
+    try {
+      const [teacherRes, subjectRes] = await Promise.all([
+        axios.get(`${BASE}/teachers`),
+        axios.get(`${BASE}/subjects`),
+      ]);
+
+      setTeachers(teacherRes.data.data || []);
+      setSubjects(subjectRes.data.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
-    fetchTeachers()
-      .then((data) => setTeachers(Array.isArray(data) ? data : data.teachers ?? []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    fetchData();
   }, []);
 
+  // handle input change
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  // handle subject select
+  const handleSubjectSelect = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions).map(
+      (opt) => opt.value
+    );
+
+    setForm({ ...form, subjects: selectedOptions });
+  };
+
+  // submit
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      await axios.post(`${BASE}/teachers`, form);
+
+      setForm({ name: "", email: "", subjects: [] });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Error creating teacher");
+    }
+  };
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10">
+    <div className="min-h-screen bg-gray-50 text-gray-800 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
 
-      {/* ── Page header ── */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Teachers</h1>
-          <p className="text-slate-500 mt-1 text-sm">
-            Faculty members and their assigned subjects.
-          </p>
+        {/* Title */}
+        <h1 className="text-2xl font-semibold">Teachers</h1>
+
+        {/* Form */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
+          <h2 className="text-lg font-medium">Add Teacher</h2>
+
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <input
+              type="text"
+              name="name"
+              placeholder="Teacher Name"
+              value={form.name}
+              onChange={handleChange}
+              className="border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={handleChange}
+              className="border border-gray-300 rounded-md px-3 py-2"
+              required
+            />
+
+            {/* Multi-select subjects */}
+            <select
+              multiple
+              onChange={handleSubjectSelect}
+              className="border border-gray-300 rounded-md px-3 py-2 h-32"
+            >
+              {subjects.map((sub) => (
+                <option key={sub._id} value={sub._id}>
+                  {sub.name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="submit"
+              className="md:col-span-3 border text-blue-500 border-blue-500 hover:text-white hover:bg-blue-600 transition-all px-4 py-2 rounded-md font-medium"
+            >
+              Add Teacher
+            </button>
+          </form>
         </div>
-        {!loading && !error && (
-          <span className="bg-teal-50 text-teal-700 text-xs font-semibold px-3 py-1 rounded-full border border-teal-100">
-            {teachers.length} teachers
-          </span>
-        )}
+
+        {/* Table */}
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+          <h2 className="text-lg font-medium mb-4">All Teachers</h2>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border p-2 text-left">Name</th>
+                  <th className="border p-2 text-left">Email</th>
+                  <th className="border p-2 text-left">Subjects</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teachers.map((teacher) => (
+                  <tr key={teacher._id}>
+                    <td className="border p-2">{teacher.name}</td>
+                    <td className="border p-2">{teacher.email}</td>
+                    <td className="border p-2">
+                      {teacher.subjects?.length > 0
+                        ? teacher.subjects.map((s) => s.name).join(", ")
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {teachers.length === 0 && (
+              <p className="text-gray-500 mt-3 text-sm">
+                No teachers found
+              </p>
+            )}
+          </div>
+        </div>
+
       </div>
-
-      {/* ── States ── */}
-      {loading && <StatusMessage type="loading" message="Loading teachers…" />}
-      {!loading && error && <StatusMessage type="error" message={error} />}
-      {!loading && !error && teachers.length === 0 && (
-        <StatusMessage type="empty" message="No teachers found." />
-      )}
-
-      {/* ── Cards grid ── */}
-      {!loading && !error && teachers.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teachers.map((teacher, idx) => {
-            const subjectList = resolveSubjects(teacher.subjects);
-
-            return (
-              <div
-                key={teacher._id ?? idx}
-                className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-teal-200 transition-all"
-              >
-                {/* Avatar + name */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                    {(teacher.name ?? "?")
-                      .split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-800 truncate">
-                      {teacher.name ?? "Unknown"}
-                    </p>
-                    <p className="text-xs text-slate-400 truncate">
-                      {teacher.email ?? "No email"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Subjects */}
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                    Subjects Assigned
-                  </p>
-                  {subjectList.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {subjectList.map((subject) => (
-                        <span
-                          key={subject}
-                          className="bg-teal-50 text-teal-700 text-xs font-medium px-2.5 py-0.5 rounded-full border border-teal-100"
-                        >
-                          {subject}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-300 italic">
-                      No subjects assigned
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
