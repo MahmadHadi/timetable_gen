@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import Select from "react-select";
 
 const BASE = "http://localhost:5000/api";
 
@@ -37,13 +38,13 @@ export default function TeachersPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // handle subject select
-  const handleSubjectSelect = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions).map(
-      (opt) => opt.value
-    );
-
-    setForm({ ...form, subjects: selectedOptions });
+  // handle subject select with react-select
+  const handleSubjectSelect = (selectedOptions) => {
+    // Extract just the IDs from selected options
+    const selectedIds = selectedOptions
+      ? selectedOptions.map((opt) => opt.value)
+      : [];
+    setForm({ ...form, subjects: selectedIds });
   };
 
   // submit
@@ -61,10 +62,76 @@ export default function TeachersPage() {
     }
   };
 
+  // Convert subjects to react-select format
+  const subjectOptions = subjects.map((sub) => ({
+    value: sub._id,
+    label: sub.name,
+  }));
+
+  // Get currently selected options for react-select
+  const selectedOptions = subjectOptions.filter((opt) =>
+    form.subjects.includes(opt.value),
+  );
+
+  // Custom styles to match your theme
+  const customStyles = {
+    control: (base) => ({
+      ...base,
+      borderColor: "#d1d5db",
+      borderRadius: "0.375rem",
+      minHeight: "42px",
+      "&:hover": {
+        borderColor: "#d1d5db",
+      },
+      "&:focus-within": {
+        borderColor: "#d1d5db",
+        boxShadow: "none",
+      },
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? "#dbeafe"
+        : state.isFocused
+          ? "#f3f4f6"
+          : "white",
+      color: state.isSelected ? "#1e40af" : "#1f2937",
+      "&:active": {
+        backgroundColor: "#dbeafe",
+      },
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: "#dbeafe",
+      borderRadius: "0.375rem",
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: "#1e40af",
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: "#1e40af",
+      "&:hover": {
+        backgroundColor: "#bfdbfe",
+        color: "#1e3a8a",
+      },
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: "#9ca3af",
+    }),
+    menu: (base) => ({
+      ...base,
+      borderRadius: "0.375rem",
+      border: "1px solid #d1d5db",
+      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+    }),
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-
         {/* Title */}
         <h1 className="text-2xl font-semibold">Teachers</h1>
 
@@ -72,8 +139,10 @@ export default function TeachersPage() {
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
           <h2 className="text-lg font-medium">Add Teacher</h2>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
+          <form
+            onSubmit={handleSubmit}
+            className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          >
             <input
               type="text"
               name="name"
@@ -94,18 +163,21 @@ export default function TeachersPage() {
               required
             />
 
-            {/* Multi-select subjects */}
-            <select
-              multiple
-              onChange={handleSubjectSelect}
-              className="border border-gray-300 rounded-md px-3 py-2 h-32"
-            >
-              {subjects.map((sub) => (
-                <option key={sub._id} value={sub._id}>
-                  {sub.name}
-                </option>
-              ))}
-            </select>
+            {/* Multi-select subjects with react-select */}
+            <div className="md:col-span-1">
+              <Select
+                options={subjectOptions}
+                value={selectedOptions}
+                onChange={handleSubjectSelect}
+                isMulti
+                placeholder="Search and select subjects..."
+                styles={customStyles}
+                className="basic-multi-select"
+                classNamePrefix="select"
+                isClearable={false}
+                noOptionsMessage={() => "No subjects found"}
+              />
+            </div>
 
             <button
               type="submit"
@@ -145,13 +217,10 @@ export default function TeachersPage() {
             </table>
 
             {teachers.length === 0 && (
-              <p className="text-gray-500 mt-3 text-sm">
-                No teachers found
-              </p>
+              <p className="text-gray-500 mt-3 text-sm">No teachers found</p>
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
