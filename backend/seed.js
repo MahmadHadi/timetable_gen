@@ -1,3 +1,4 @@
+import "dotenv/config";
 import mongoose from "mongoose";
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
@@ -33,7 +34,8 @@ const SUBJECT_DATA = [
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function seed() {
-  await mongoose.connect("mongodb+srv://nayanihadi97_db_user:XO1gsQ4RsLM4lvSF@timetablegen.n7wq4gx.mongodb.net/?appName=TimeTableGen");
+  console.log("process.env.MONGO_URI", process.env.MONGO_URI)
+  await mongoose.connect(process.env.MONGO_URI);
   console.log("Connected to MongoDB\n");
 
   // 1. Clear existing data
